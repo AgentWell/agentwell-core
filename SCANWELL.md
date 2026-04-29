@@ -37,7 +37,7 @@ Most security tools scan one layer. Real AI agent deployments have many.
 │  ┌────▼─────────▼──────────▼───▼──────────▼───▼────────┐   │    │
 │  │ openclaw-agent container                            │   │    │
 │  │   ├── OpenClaw (Node.js)                            │   │    │
-│  │   ├── Python tools (bandit, semgrep, pip-audit)     │   │    │
+│  │   ├── Python tools (semgrep, pip-audit)     │   │    │
 │  │   └── Plugin runtime deps                           │   │    │
 │  ├─────────────────────────────────────────────────────│   │    │
 │  │ litellm container         squid container           │   │    │
