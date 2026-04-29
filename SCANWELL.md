@@ -28,24 +28,24 @@ Most security tools scan one layer. Real AI agent deployments have many.
 ┌─────────────────────────────────────────────────────────────────┐
 │                    A Self-Hosted AI Agent Stack                 │
 │                                                                 │
-│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌────────────┐  │
-│  │  Ubuntu  │   │  Trivy   │   │  OSV /   │   │  Semgrep   │  │
-│  │    OS    │   │ covers   │   │  npm     │   │  covers    │  │
-│  │ packages │   │ this ↓   │   │  audit   │   │  this ↓    │  │
-│  └────┬─────┘   │          │   │ covers   │   │            │  │
-│       │         │          │   │  this ↓  │   │            │  │
-│  ┌────▼─────────▼──────────▼───▼──────────▼───▼────────┐   │  │
-│  │ openclaw-agent container                              │   │  │
-│  │   ├── OpenClaw (Node.js)                             │   │  │
-│  │   ├── Python tools (bandit, semgrep, pip-audit)      │   │  │
-│  │   └── Plugin runtime deps                            │   │  │
-│  ├───────────────────────────────────────────────────── │   │  │
-│  │ litellm container         squid container             │   │  │
-│  ├───────────────────────────────────────────────────── │   │  │
-│  │ Host: Ollama    Tailscale    Scripts    Config files  │   │  │
-│  └───────────────────────────────────────────────────── │   │  │
-│       ↑                                                  │   │  │
-│  No single tool covers all of this.                      │   │  │
+│  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌────────────┐    │
+│  │  Ubuntu  │   │  Trivy   │   │  OSV /   │   │  Semgrep   │    │
+│  │    OS    │   │ covers   │   │  npm     │   │  covers    │    │
+│  │ packages │   │ this ↓   │   │  audit   │   │  this ↓    │    │
+│  └────┬─────┘   │          │   │ covers   │   │            │    │
+│       │         │          │   │  this ↓  │   │            │    │
+│  ┌────▼─────────▼──────────▼───▼──────────▼───▼────────┐   │    │
+│  │ openclaw-agent container                            │   │    │
+│  │   ├── OpenClaw (Node.js)                            │   │    │
+│  │   ├── Python tools (bandit, semgrep, pip-audit)     │   │    │
+│  │   └── Plugin runtime deps                           │   │    │
+│  ├─────────────────────────────────────────────────────│   │    │
+│  │ litellm container         squid container           │   │    │
+│  ├─────────────────────────────────────────────────────│   │    │
+│  │ Host: Ollama    Tailscale    Scripts    Config files│   │    │
+│  └─────────────────────────────────────────────────────│   │    │
+│       ↑                                                │   │    │
+│  No single tool covers all of this.                    │   │    │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,7 +72,7 @@ Most security tools scan one layer. Real AI agent deployments have many.
 │  M  osv-scanner       Multi-ecosystem lock files (all roots)        │
 │  N  Semgrep SAST      Code security: hooks, scripts, agent code     │
 │                                                                     │
-│  ── CONTAINER LAYER (when running) ─────────────────────────────   │
+│  ── CONTAINER LAYER (when running) ─────────────────────────────    │
 │  B  Container Images  Trivy — auto-discovers all running containers │
 │  C  Agent npm audit   npm audit inside openclaw-agent               │
 │  D  LiteLLM npm       npm audit inside litellm container            │
@@ -128,25 +128,25 @@ flowchart TD
 
 No single tool comes close to the coverage ScanWell provides out of the box.
 
-| Capability | ScanWell | GitHub OSV | Trivy alone | Snyk | Manual scans |
+| Capability                        | ScanWell | GitHub OSV | Trivy alone | Snyk | Manual scans |
 |---|:---:|:---:|:---:|:---:|:---:|
-| **OS packages (debsecan)** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Container image CVEs** | ✅ | ❌ | ✅ | ✅ | varies |
-| **Auto-discovers all containers** | ✅ | ❌ | manual | manual | ❌ |
-| **npm deps (inside containers)** | ✅ | ❌ | partial | ✅ | ❌ |
-| **pip deps (inside containers)** | ✅ | ❌ | partial | ✅ | ❌ |
-| **Host binary CVEs (Ollama, Tailscale)** | ✅ | ❌ | manual | ❌ | ❌ |
-| **Secrets hygiene (plaintext keys)** | ✅ | ❌ | partial | partial | ❌ |
-| **Container env credential scan** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Known agent CVE version check** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Multi-ecosystem lock files (osv)** | ✅ | ✅ | ❌ | ✅ | ❌ |
-| **SAST code analysis (semgrep)** | ✅ | ❌ | ❌ | partial | separate tool |
-| **Scans agent-written code** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Works without containers running** | ✅ | ✅ | partial | ✅ | varies |
-| **macOS + Linux unified** | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **SOC2 JSON evidence output** | ✅ | ❌ | ❌ | partial | ❌ |
-| **Secure install (checksum verified)** | ✅ | n/a | n/a | n/a | ❌ |
-| **Free, no account required** | ✅ | ✅ | ✅ | partial | ✅ |
+| **OS packages (debsecan)**               | ✅ |    ❌    | ❌      | ❌      | ❌ |
+| **Container image CVEs**                 | ✅ |    ❌    | ✅      | ✅      | varies |
+| **Auto-discovers all containers**        | ✅ |    ❌    | manual   | manual  | ❌ |
+| **npm deps (inside containers)**         | ✅ |    ❌    | partial  | ✅      | ❌ |
+| **pip deps (inside containers)**         | ✅ |    ❌    | partial  | ✅      | ❌ |
+| **Host binary CVEs (Ollama, Tailscale)** | ✅ |    ❌    | manual   | ❌      | ❌ |
+| **Secrets hygiene (plaintext keys)**     | ✅ |    ❌    | partial  | partial | ❌ |
+| **Container env credential scan**        | ✅ |    ❌    | ❌       | ❌     | ❌ |
+| **Known agent CVE version check**        | ✅ |    ❌    | ❌       | ❌     | ❌ |
+| **Multi-ecosystem lock files (osv)**     | ✅ |    ✅    | ❌       | ✅     | ❌ |
+| **SAST code analysis (semgrep)**         | ✅ |    ❌    | ❌       | partial | separate tool |
+| **Scans agent-written code**             | ✅ |    ❌    | ❌       | ❌     | ❌ |
+| **Works without containers running**     | ✅ |    ✅    | partial  | ✅      | varies |
+| **macOS + Linux unified**                | ✅ |    ✅    | ✅       | ✅     | ❌ |
+| **SOC2 JSON evidence output**            | ✅ |    ❌    | ❌       | partial | ❌ |
+| **Secure install (checksum verified)**   | ✅ |    n/a    | n/a      | n/a     | ❌ |
+| **Free, no account required**            | ✅ |    ✅    | ✅       | partial | ✅ |
 
 ### Why GitHub's Built-in OSV Scanning Isn't Enough
 
@@ -173,15 +173,26 @@ Trivy is excellent at what it does. But alone it:
 
 ### Requirements
 
+
 | Tool | Required | Purpose | Auto-installed |
-|---|---|---|---|
-| `bash` 4.0+ | ✅ | Script runtime | — |
+|------|-----------|----------------|----------------|
+| `bash` 4.0+| ✅ | Script runtime | — |
 | `trivy` | ✅ | Container + binary CVE scanning | ✅ `--install` |
 | `jq` | ✅ | JSON parsing | ✅ `--install` |
 | `debsecan` | Linux only | OS package CVEs | ✅ `--install` |
 | `curl` | Linux | Secure downloads | ✅ `--install` |
 | `osv-scanner` | Optional | Multi-ecosystem dep CVEs | ✅ prompted |
 | `semgrep` | Optional | SAST code analysis | ✅ prompted |
+
+
+Tool,Status,Purpose,Auto-Installation
+bash 4.0+,✅,Script runtime & logic,—
+trivy,✅,Container & binary CVE scanning,✅ --install
+jq,✅,JSON stream processing,✅ --install
+debsecan,🐧,OS package vulnerability audits,✅ --install
+curl,🐧,Secure data & asset retrieval,✅ --install
+osv-scanner,🔍,Multi-ecosystem dependency audits,Interactive
+semgrep,🛡️,Static Analysis (SAST) for code,Interactive
 
 ### Linux (Debian/Ubuntu VPS)
 
