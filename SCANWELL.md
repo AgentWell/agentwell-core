@@ -1,7 +1,7 @@
 # 🔍 ScanWell — Full-Stack AI Agent Security Scanner
 
 > **Free. Open source. No dashboard required.**
-> Part of the [AgentShield Core](https://github.com/agentshield-ai/agentshield-core) stack.
+> Part of the [AgentWell Core](https://github.com/agentwell-ai/agentwell-core) stack.
 
 ---
 
@@ -82,7 +82,7 @@ Most security tools scan one layer. Real AI agent deployments have many.
 │  I.1 Container Env    Scans live env vars for credential values     │
 │                                                                     │
 │  ── REPORTING ───────────────────────────────────────────────────   │
-│  L  AgentShield CP    Optional upload to control plane dashboard    │
+│  L  AgentWell CP    Optional upload to control plane dashboard    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -190,7 +190,7 @@ Trivy is excellent at what it does. But alone it:
 
 ```bash
 # Download
-curl -fsSL https://raw.githubusercontent.com/agentshield-ai/agentshield-core/main/scanwell.sh \
+curl -fsSL https://raw.githubusercontent.com/agentwell-ai/agentwell-core/main/scanwell.sh \
   -o scanwell.sh && chmod +x scanwell.sh
 
 # Install required tools (securely — signed repos, verified binaries)
@@ -213,7 +213,7 @@ During `--install`, you'll be prompted for optional deeper-scan tools:
 
 ```bash
 # Homebrew required — install from https://brew.sh if needed
-curl -fsSL https://raw.githubusercontent.com/agentshield-ai/agentshield-core/main/scanwell.sh \
+curl -fsSL https://raw.githubusercontent.com/agentwell-ai/agentwell-core/main/scanwell.sh \
   -o scanwell.sh && chmod +x scanwell.sh
 
 bash scanwell.sh --install
@@ -421,7 +421,7 @@ Reads live environment variables from running containers and checks their VALUES
 
 ### J — OpenClaw Version CVE Check
 
-Checks the running OpenClaw version against a curated list of known critical CVEs. Fetches a live feed from AgentShield (falls back to baked-in list if unavailable):
+Checks the running OpenClaw version against a curated list of known critical CVEs. Fetches a live feed from AgentWell (falls back to baked-in list if unavailable):
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -508,16 +508,16 @@ Excluded from semgrep:
 
 ---
 
-### L — AgentShield Control Plane Upload
+### L — AgentWell Control Plane Upload
 
 ```bash
 # Enable uploads by setting your API key
-AGENTSHIELD_API_KEY=your-key bash scanwell.sh
+AGENTWELL_API_KEY=your-key bash scanwell.sh
 ```
 
 Without a key, ScanWell prints a free-tier notice and exits cleanly. Findings stay local.
 
-With a key, scan results upload to the AgentShield dashboard for:
+With a key, scan results upload to the AgentWell dashboard for:
 - Trending over time
 - Cross-stack CVE comparison
 - Automated alerts
@@ -582,9 +582,9 @@ Every scan produces:
 | `ADMIN_USER` | `lord` | Admin user running the script |
 | `OPENCLAW_DOCKER_DIR` | `/home/$OPENCLAW_USER/openclaw-docker` | Container stack directory |
 | `DOPPLER_TOKEN_FILE` | `/home/$OPENCLAW_USER/.doppler/service-token` | Doppler token location |
-| `AGENTSHIELD_API_KEY` | _(unset)_ | Enables CP upload |
-| `AGENTSHIELD_CVE_FEED` | AgentShield GitHub URL | Override CVE feed URL |
-| `AGENTSHIELD_API_ENDPOINT` | `https://api.agentshield.ai/v1/scans` | Override upload endpoint |
+| `AGENTWELL_API_KEY` | _(unset)_ | Enables CP upload |
+| `AGENTWELL_CVE_FEED` | AgentWell GitHub URL | Override CVE feed URL |
+| `AGENTWELL_API_ENDPOINT` | `https://api.agentwell.ai/v1/scans` | Override upload endpoint |
 
 ### Runtime Paths (auto-selected)
 
@@ -653,7 +653,7 @@ Yes. Set `OPENCLAW_USER` to any user, and `OPENCLAW_DOCKER_DIR` to any container
 
 **Q: Does ScanWell upload anything without my consent?**
 
-No. Section L (AgentShield CP upload) only runs if `AGENTSHIELD_API_KEY` is set. Without it, the tool prints a free-tier notice and exits cleanly. Nothing leaves your machine.
+No. Section L (AgentWell CP upload) only runs if `AGENTWELL_API_KEY` is set. Without it, the tool prints a free-tier notice and exits cleanly. Nothing leaves your machine.
 
 **Q: Can I run this in CI?**
 
@@ -676,9 +676,9 @@ Trivy scans **container image layers** — it finds CVEs in OS packages and lang
 
 ---
 
-## Part of AgentShield Core
+## Part of AgentWell Core
 
-ScanWell is the scanning component of the AgentShield open-source stack. The full stack includes:
+ScanWell is the scanning component of the AgentWell open-source stack. The full stack includes:
 
 - **Bridge networking** — kernel-enforced network isolation for containers
 - **Squid allowlist** — domain whitelist enforcement for all outbound agent requests
@@ -686,8 +686,8 @@ ScanWell is the scanning component of the AgentShield open-source stack. The ful
 - **Doppler integration** — runtime secrets injection, nothing on disk
 - **ScanWell** — full-stack CVE and security scanner ← you are here
 
-All components are MIT licensed and free to use without a dashboard. The [AgentShield Control Plane](https://agentshield.ai) adds dashboards, alerting, trending, and SOC2 evidence exports.
+All components are MIT licensed and free to use without a dashboard. The [AgentWell Control Plane](https://agentwell.ai) adds dashboards, alerting, trending, and SOC2 evidence exports.
 
 ---
 
-*ScanWell is maintained by [AgentShield](https://agentshield.ai) — security enforcement for self-hosted AI agents.*
+*ScanWell is maintained by [AgentWell](https://agentwell.ai) — security enforcement for self-hosted AI agents.*
