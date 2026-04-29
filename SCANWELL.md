@@ -185,14 +185,6 @@ Trivy is excellent at what it does. But alone it:
 | `semgrep` | Optional | SAST code analysis | ✅ prompted |
 
 
-Tool,Status,Purpose,Auto-Installation
-bash 4.0+,✅,Script runtime & logic,—
-trivy,✅,Container & binary CVE scanning,✅ --install
-jq,✅,JSON stream processing,✅ --install
-debsecan,🐧,OS package vulnerability audits,✅ --install
-curl,🐧,Secure data & asset retrieval,✅ --install
-osv-scanner,🔍,Multi-ecosystem dependency audits,Interactive
-semgrep,🛡️,Static Analysis (SAST) for code,Interactive
 
 ### Linux (Debian/Ubuntu VPS)
 
