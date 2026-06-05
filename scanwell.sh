@@ -1232,6 +1232,11 @@ header "N. SAST — semgrep (code security)"
 if ! command -v semgrep &>/dev/null; then
   warn "semgrep not installed on host — run: sudo bash $0 --install  (will prompt to add)"
   warn "Note: semgrep is baked into the openclaw-agent container for in-container code scanning"
+elif ! python3 -c "import semgrep" 2>/dev/null; then
+  _sg_loc=$(pip3 show semgrep 2>/dev/null | awk '/^Location:/{print $2}')
+  warn "semgrep is installed but not importable — likely a permissions issue from a root pip install."
+  warn "Fix with: sudo chmod -R a+rX ${_sg_loc}/semgrep"
+  warn "Then re-run this script."
 elif [[ ${#_code_scan_roots[@]} -eq 0 ]]; then
   warn "No scan roots discovered — semgrep skipped"
 else
@@ -1253,6 +1258,11 @@ else
         --exclude '.npm' \
         --exclude '.cache' \
         --exclude 'node_modules' \
+        --exclude 'vendor' \
+        --exclude 'dist' \
+        --exclude 'build' \
+        --exclude 'bundled' \
+        --exclude 'third_party' \
         --exclude 'overlay' \
         --exclude 'overlay2' \
         --exclude 'openclaw-deps' \
@@ -1261,6 +1271,15 @@ else
         --exclude '.claude' \
         --exclude '.ssh' \
         --exclude '.sshbak' \
+        --exclude '.config' \
+        --exclude '.ollama' \
+        --exclude '.semgrep' \
+        --exclude '.miniscanwell' \
+        --exclude '.cve-notify' \
+        --exclude 'openclaw-docs' \
+        --exclude 'reports' \
+        --exclude 'ghsa-cache' \
+        --exclude 'clones' \
         --exclude '*.jsonl' \
         --exclude 'plugin-runtime-deps' \
         --exclude 'memory' \
@@ -1305,6 +1324,204 @@ else
     rm -f "$_sg_tmp"
   done
   log "semgrep total: ${_sg_e_total} errors, ${_sg_w_total} warnings"
+fi
+
+# O. AGENT GATEWAY BINDING AUDIT
+header "O. AGENT GATEWAY — Port binding audit (CVE-2026-25253 class)"
+if [[ "$IS_MACOS" == "true" ]]; then
+  _gw_bindings=$(netstat -an 2>/dev/null | awk '/18789/ && /LISTEN/ {print $4}' || true)
+else
+  _gw_bindings=$(ss -tlnp 2>/dev/null | awk '$4 ~ /:18789$/ {print $4}' || true)
+fi
+if [[ -z "$_gw_bindings" ]]; then
+  warn "Gateway port 18789: not listening — containers may be down; verify binding when running"
+else
+  _gw_bad=0
+  while IFS= read -r _b; do
+    [[ -z "$_b" ]] && continue
+    # Flag all-interface bindings: 0.0.0.0, ::, or * (macOS wildcard)
+    if echo "$_b" | grep -qE '^(0\.0\.0\.0|::|[*])[.:]'; then
+      crit "Gateway 18789 EXPOSED on all interfaces: ${_b}"
+      add_finding "gateway-binding" "CRITICAL" "openclaw-gateway" "CVE-2026-25253-class" \
+        "Port 18789 bound to ${_b} — must be 127.0.0.1 or Tailscale only (MITRE: hundreds of exposed instances)"
+      (( TOTAL_CRITICAL++ )) || true
+      (( _gw_bad++ )) || true
+    else
+      ok "Gateway 18789 binding: ${_b} — restricted (localhost or Tailscale)"
+    fi
+  done <<< "$_gw_bindings"
+  [[ "$_gw_bad" -eq 0 ]] && ok "Gateway port 18789: all bindings restricted"
+fi
+
+# P. COGNITIVE FILE INTEGRITY MONITORING
+header "P. COGNITIVE FILES — Hash integrity check (adversa.ai attack 5 class)"
+_COG_HASH_FILE="${LOG_DIR}/cognitive-hashes.txt"
+_cog_search=()
+[[ -d "$OPENCLAW_DOCKER_DIR" ]]         && _cog_search+=("$OPENCLAW_DOCKER_DIR")
+[[ -d "${OPENCLAW_HOME}/.openclaw" ]]   && _cog_search+=("${OPENCLAW_HOME}/.openclaw")
+[[ -d "$ADMIN_HOME" ]]                  && _cog_search+=("$ADMIN_HOME")
+_cog_files=()
+if [[ ${#_cog_search[@]} -gt 0 ]]; then
+  while IFS= read -r _f; do
+    _cog_files+=("$_f")
+  done < <(find "${_cog_search[@]}" -maxdepth 6 \
+    \( -name "SOUL.md" -o -name "CLAUDE.md" -o -name "AGENTS.md" -o -name "SKILL.md" \) \
+    ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/.cache/*" \
+    ! -path "*/.local/share/containers/*" ! -path "*/openclaw-docs/*" \
+    2>/dev/null | sort -u | head -50)
+fi
+if [[ ${#_cog_files[@]} -eq 0 ]]; then
+  ok "Cognitive files: none found in monitored paths"
+else
+  log "Cognitive integrity: checking ${#_cog_files[@]} file(s)"
+  _cog_changed=0
+  _cog_new=0
+  _cog_tmp=$(mktemp)
+  for _cf in "${_cog_files[@]}"; do
+    [[ ! -f "$_cf" ]] && continue
+    if [[ "$IS_MACOS" == "true" ]]; then
+      _chash=$(shasum -a 256 "$_cf" 2>/dev/null | awk '{print $1}' || true)
+    else
+      _chash=$(sha256sum "$_cf" 2>/dev/null | awk '{print $1}' || true)
+    fi
+    [[ -z "$_chash" ]] && continue
+    echo "${_chash}  ${_cf}" >> "$_cog_tmp"
+    _stored=""
+    [[ -f "$_COG_HASH_FILE" ]] && \
+      _stored=$(grep -F "  ${_cf}" "$_COG_HASH_FILE" 2>/dev/null | awk '{print $1}' | head -1 || true)
+    if [[ -z "$_stored" ]]; then
+      log "Cognitive baseline established: $(basename "$_cf")"
+      (( _cog_new++ )) || true
+    elif [[ "$_stored" == "$_chash" ]]; then
+      ok "Cognitive file unchanged: $(basename "$_cf")"
+    else
+      crit "COGNITIVE FILE CHANGED: $(basename "$_cf") — hash mismatch (investigate immediately)"
+      add_finding "cognitive-integrity" "HIGH" "$(basename "$_cf")" "cognitive-poison" \
+        "$(basename "$_cf") modified since last scan — possible adversa.ai attack 5 class poisoning"
+      (( TOTAL_HIGH++ )) || true
+      (( _cog_changed++ )) || true
+    fi
+  done
+  cp "$_cog_tmp" "$_COG_HASH_FILE" 2>/dev/null || true
+  rm -f "$_cog_tmp"
+  if [[ "$_cog_changed" -gt 0 ]]; then
+    crit "${_cog_changed} cognitive file(s) changed since last scan — investigate immediately"
+  elif [[ "$_cog_new" -gt 0 ]]; then
+    ok "Cognitive files: ${#_cog_files[@]} checked, 0 changed, ${_cog_new} new baseline(s) recorded"
+  else
+    ok "Cognitive files: ${#_cog_files[@]} checked, all unchanged"
+  fi
+fi
+
+# Q. KILL SWITCH FILE DETECTION
+header "Q. KILL SWITCH — Emergency stop mechanism check"
+_ks_file="/home/lord/.chainwell/kill"
+_ks_search_dir="$OPENCLAW_DOCKER_DIR"
+if [[ -f "$_ks_file" ]]; then
+  crit "Kill switch ACTIVE: ${_ks_file} exists — agent is halted"
+  add_finding "kill-switch" "CRITICAL" "openclaw-agent" "kill-switch-active" \
+    "Kill switch file ${_ks_file} is present — agent startup is blocked"
+  (( TOTAL_CRITICAL++ )) || true
+else
+  _ks_refs=$(grep -rEl "\.chainwell/kill|kill_switch|KILL_SWITCH" "$_ks_search_dir" \
+    2>/dev/null | grep -v "\.git" || true)
+  if [[ -z "$_ks_refs" ]]; then
+    warn "No kill switch mechanism found in agent code — no emergency stop wired into ${_ks_search_dir}"
+    add_finding "kill-switch" "HIGH" "openclaw-agent" "no-kill-switch" \
+      "No kill switch check found in agent entrypoint — no emergency stop available"
+    (( TOTAL_HIGH++ )) || true
+  else
+    ok "Kill switch mechanism found in agent code:"
+    echo "$_ks_refs" | while read -r _f; do log "  $_f"; done
+  fi
+fi
+
+# R. AGENT API CALL RATE MONITORING
+header "R. API RATE — Ollama call rate (cost-bomb detection)"
+_ollama_rate_limit="${SCANWELL_OLLAMA_RATE_LIMIT:-100}"
+# NOTE: Ollama is in NO_PROXY — its traffic bypasses Squid entirely, so counting
+# Ollama hits in Squid access logs always returns 0. Use journalctl as the primary
+# source; fall back to /api/ps (active models indicator) when journalctl is unavailable.
+
+# Keep _squid_log_data populated for Section S reuse (IOC IP check)
+_squid_log="/var/log/squid/access.log"
+_squid_log_data=""
+if [[ -r "$_squid_log" ]]; then
+  _squid_log_data=$(tail -500 "$_squid_log" 2>/dev/null || true)
+elif [[ -n "$CONTAINER_RUNTIME" ]]; then
+  _squid_log_data=$(container_exec \
+    "${CONTAINER_RUNTIME} logs --since 1h openclaw-squid 2>/dev/null | tail -500" \
+    2>/dev/null || true)
+fi
+
+# Count Ollama POST requests via journalctl (bypasses NO_PROXY limitation)
+_ollama_calls=""
+if command -v journalctl &>/dev/null; then
+  _ollama_calls=$(journalctl -u ollama --since "1 hour ago" --no-pager 2>/dev/null \
+    | grep -c "POST /api" 2>/dev/null || echo 0)
+fi
+
+if [[ -n "$_ollama_calls" ]]; then
+  _half_limit=$(( _ollama_rate_limit / 2 ))
+  if [[ "$_ollama_calls" -ge "$_ollama_rate_limit" ]]; then
+    crit "Ollama API calls last hour: ${_ollama_calls} — exceeds threshold of ${_ollama_rate_limit} (possible cost bomb or runaway agent)"
+    add_finding "api-rate" "HIGH" "ollama" "cost-bomb" \
+      "${_ollama_calls} Ollama POST calls in last 60min — threshold is ${_ollama_rate_limit}"
+    (( TOTAL_HIGH++ )) || true
+  elif [[ "$_ollama_calls" -ge "$_half_limit" ]]; then
+    warn "Ollama API calls last hour: ${_ollama_calls} — elevated (threshold: ${_ollama_rate_limit}; watch for runaway agent)"
+  else
+    ok "Ollama API calls last hour: ${_ollama_calls} via journalctl (threshold: ${_ollama_rate_limit})"
+  fi
+else
+  # journalctl unavailable: /api/ps shows currently loaded models as an activity indicator
+  _active_models=$(curl -s --max-time 3 http://localhost:11434/api/ps 2>/dev/null \
+    | python3 -c "import json,sys; d=json.load(sys.stdin); \
+print(len(d.get('models',[])))" 2>/dev/null || echo "")
+  if [[ -n "$_active_models" ]]; then
+    ok "Ollama /api/ps: ${_active_models} model(s) currently loaded (journalctl unavailable — no call-rate data)"
+  else
+    warn "Ollama rate: journalctl unavailable and /api/ps unreachable — monitoring skipped"
+  fi
+fi
+
+# S. IOC IP CHECK — ClawHavoc C2 detection
+header "S. IOC CHECK — Squid outbound connections vs known C2 IPs"
+_ioc_file="/home/lord/.chainwell/ioc-ips.txt"
+if [[ ! -f "$_ioc_file" ]]; then
+  mkdir -p "$(dirname "$_ioc_file")" 2>/dev/null || true
+  cat > "$_ioc_file" << 'IOC_EOF'
+# ClawHavoc C2 servers — adversa.ai February 2026
+91.92.242.1
+91.92.242.2
+91.92.242.3
+91.92.242.100
+91.92.242.101
+IOC_EOF
+  log "IOC file created with ClawHavoc C2 range: ${_ioc_file}"
+fi
+# Reuse _squid_log_data fetched in Section R (avoids duplicate container exec)
+if [[ -z "$_squid_log_data" ]]; then
+  warn "Squid log not readable — IOC check skipped"
+else
+  _recent_ips=$(echo "$_squid_log_data" | \
+    grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | sort -u || true)
+  _ioc_count=0
+  _ioc_hits=0
+  while IFS= read -r _ip; do
+    [[ -z "$_ip" || "$_ip" == \#* ]] && continue
+    (( _ioc_count++ )) || true
+    if echo "$_recent_ips" | grep -qxF "$_ip"; then
+      crit "IOC MATCH: outbound connection to known C2 IP: ${_ip} (ClawHavoc campaign)"
+      add_finding "ioc-match" "CRITICAL" "squid" "ClawHavoc-C2" \
+        "Outbound connection to known C2: ${_ip}"
+      (( TOTAL_CRITICAL++ )) || true
+      (( _ioc_hits++ )) || true
+    fi
+  done < "$_ioc_file"
+  if [[ "$_ioc_hits" -eq 0 ]]; then
+    ok "IOC check: no connections to ${_ioc_count} known C2 IPs detected"
+  fi
 fi
 
 # ── FINAL SUMMARY (exact format you requested) ─────────────────────────────────
@@ -1408,6 +1625,41 @@ elif [[ "$ALERT_COUNT" -gt 0 ]]; then
   [[ "$TOTAL_HIGH" -gt 0 ]]     && warn "HIGH FINDINGS: ${TOTAL_HIGH} issues at HIGH threshold"
   [[ "$TOTAL_MEDIUM" -gt 0 ]]   && log  "MEDIUM FINDINGS: ${TOTAL_MEDIUM} issues at MEDIUM threshold"
   blue_header "NEXT STEPS"
+  if [[ "$TOTAL_CRITICAL" -gt 0 ]]; then
+    echo " 🔴 Critical findings:" | tee -a "$REPORT_TXT"
+    _crit_shown=false
+    # Trivy CRITICAL CVEs — one JSON per container / binary scan
+    if compgen -G "${LOG_DIR}/${TIMESTAMP}-trivy-*.json" > /dev/null 2>&1; then
+      _trivy_out=$(jq -r \
+        '.Results[]?.Vulnerabilities[]? | select(.Severity=="CRITICAL") |
+         "    [Trivy] " + .VulnerabilityID + "  " + .PkgName + "  CRITICAL  " +
+         ((.Title // "") | .[0:70])' \
+        "${LOG_DIR}/${TIMESTAMP}"-trivy-*.json 2>/dev/null | sort -u | head -15)
+      if [[ -n "$_trivy_out" ]]; then
+        echo "$_trivy_out" | tee -a "$REPORT_TXT"
+        _crit_shown=true
+      fi
+    fi
+    # Semgrep ERROR findings — one JSON per scan root
+    if compgen -G "${LOG_DIR}/${TIMESTAMP}-semgrep-*.json" > /dev/null 2>&1; then
+      _semgrep_out=$(jq -r \
+        '.results[]? | select(.extra.severity=="ERROR") |
+         "    [Semgrep] " + (.check_id | split(".")[-1]) + "  ERROR  " +
+         (.path | split("/") | .[-3:] | join("/")) + ":" + (.start.line | tostring) +
+         "  " + ((.extra.message // "") | .[0:60])' \
+        "${LOG_DIR}/${TIMESTAMP}"-semgrep-*.json 2>/dev/null | sort -u | head -10)
+      if [[ -n "$_semgrep_out" ]]; then
+        echo "$_semgrep_out" | tee -a "$REPORT_TXT"
+        _crit_shown=true
+      fi
+    fi
+    # Fallback: grep report for crit() lines if JSON files are absent
+    if [[ "$_crit_shown" == "false" ]]; then
+      grep '\[🔴\]' "$REPORT_TXT" | grep -v "CRITICAL FINDINGS:" | \
+        sed 's/.*\[🔴\] /    🔴 /' | head -20 | tee -a "$REPORT_TXT"
+    fi
+    echo "" | tee -a "$REPORT_TXT"
+  fi
   # Item 1 — AgentShield CTA: plain to file, hyperlinked to terminal
   _cta=" 1. 🚀  agentshield.ai/signup — live dashboard, auto-alerts, SOC2 evidence exports & CVE trending (Starter \$39/month)"
   printf ' 1. 🚀  %s — live dashboard, auto-alerts, SOC2 evidence exports & CVE trending (Starter $39/month)\n' \
